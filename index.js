@@ -5,7 +5,12 @@ const multer = require('multer');
 const upload = require(__dirname + '/modules/upload-images');
 const session = require('express-session'); 
 const moment = require('moment-timezone');
+const axios = require('axios');
 
+const {
+    toDateString,
+    toDatetimeString,
+} = require(__dirname + '/modules/date-tools');
 
 const db = require(__dirname + '/modules/mysql-connect');
 const MysqlStore = require('express-mysql-session')(session);
@@ -14,8 +19,6 @@ const sessionStore = new MysqlStore({}, db);
 
 const app = express();  // 直接呼叫
 
-app.use(express.static('public'));
-app.use("/bootstrap", express.static("node_modules/bootstrap/dist"));
 
 
 
@@ -42,6 +45,20 @@ app.get('/try-session',(req,res)=>{
         session:req.session
     });
 })
+
+
+
+app.use('/member', require(__dirname + '/routes/member'));
+app.use('/member2', require(__dirname + '/routes/member2'));
+
+app.get('/yahoo', async (req, res)=>{
+    axios.get('https://tw.yahoo.com/')
+    .then(function (response) {
+      // handle success
+        console.log(response);
+        res.send(response.data);
+    })
+});
 
 // params 設定路徑參數
 // 一段一個冒號，:action? 表示此參數可有可無
@@ -101,6 +118,11 @@ app.use(adminsRouter);
 // locals掛在response身上
 app.use((req, res, next)=>{
     res.locals.shinder = '哈囉';
+
+    // template helper functions
+    res.locals.toDateString = toDateString;
+    res.locals.toDatetimeString = toDatetimeString;
+
     next();
 });
 
@@ -150,6 +172,14 @@ app.get("/",( req,res )=>{
     res.render("main",{name:'sato'});
 });
 
+
+// ------- static folder -----------
+app.use(express.static("public"));
+app.use("/bootstrap", express.static("node_modules/bootstrap/dist"));
+app.use("/joi", express.static("node_modules/joi/dist"));
+
+
+// ------- 404 -----------
 // .use接收所有HTTP的方法(get、post...)，底層是一個陣列，express先設定的先處理，404頁面須放在所有路由的後面
 app.use(( req , res )=>{
     res.send(`<h2>找不到頁面 404</h2>
