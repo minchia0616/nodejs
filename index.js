@@ -6,6 +6,7 @@ const upload = require(__dirname + '/modules/upload-images');
 const session = require('express-session'); 
 const moment = require('moment-timezone');
 const axios = require('axios');
+const bcrypt = require('bcryptjs');
 
 const {
     toDateString,
@@ -15,16 +16,25 @@ const {
 const db = require(__dirname + '/modules/mysql-connect');
 const MysqlStore = require('express-mysql-session')(session);
 const sessionStore = new MysqlStore({}, db);
+const cors = require('cors')
 
 
 const app = express();  // 直接呼叫
 
 
-
-
 // Top-level middlewares 掛在所有路由之前，後面都會吃到
-app.use(express.urlencoded({extended: false}));
-app.use(express.json());
+
+const corsOptions = {
+    credentials: true,
+    origin: (origin, cb)=>{
+        console.log({origin});
+        cb(null, true);
+    }
+};
+
+app.use(cors(corsOptions));
+// app.use(require('cors')());
+
 app.use(session({
     saveUninitialized: false,
     resave: false,
@@ -35,6 +45,21 @@ app.use(session({
     }
 
 }));
+
+// locals掛在response身上
+app.use((req, res, next)=>{
+    res.locals.shinder = '哈囉';
+
+    // template helper functions
+    res.locals.toDateString = toDateString;
+    res.locals.toDatetimeString = toDatetimeString;
+    res.locals.session = req.session;   // 讓每個頁面吃到session
+
+    next();
+});
+
+app.use(express.urlencoded({extended: false}));
+app.use(express.json());
 
 
 app.get('/try-session',(req,res)=>{
@@ -47,9 +72,11 @@ app.get('/try-session',(req,res)=>{
 })
 
 
-
 app.use('/member', require(__dirname + '/routes/member'));
 app.use('/member2', require(__dirname + '/routes/member2'));
+
+// ------- 購物車 -----------
+app.use('/carts', require(__dirname + '/routes/carts'))
 
 app.get('/yahoo', async (req, res)=>{
     axios.get('https://tw.yahoo.com/')
@@ -60,22 +87,11 @@ app.get('/yahoo', async (req, res)=>{
     })
 });
 
-// params 設定路徑參數
-// 一段一個冒號，:action? 表示此參數可有可無
-// 定義最寬鬆的路由放最後面(才不會一開始就跑進去)
+
 app.get('/my-params/:action/:id', (req, res)=>{
     res.json(req.params);
 });
 
-// app.get('/try-params1/:action/:id', (req, res)=>{
-//     res.json({code:2, params: req.params});
-// })
-// app.get('/try-params1/:action', (req, res)=>{
-//     res.json({code:3, params: req.params});
-// })
-// app.get('/try-params1/:action?/:id?', (req, res)=>{
-//     res.json({code:1, params: req.params});
-// });
 
 app.get(/^\/hi\/?/i, (req, res)=>{
     res.send({url: req.url});
@@ -115,16 +131,7 @@ app.get('/try-moment', (req, res)=>{
 const adminsRouter = require(__dirname + '/routes/admins');
 app.use('/admins', adminsRouter);   // prefix 前綴路徑
 app.use(adminsRouter);
-// locals掛在response身上
-app.use((req, res, next)=>{
-    res.locals.shinder = '哈囉';
 
-    // template helper functions
-    res.locals.toDateString = toDateString;
-    res.locals.toDatetimeString = toDatetimeString;
-
-    next();
-});
 
 
 
@@ -137,12 +144,7 @@ app.get('/try-qs', (req, res)=>{
     res.json(req.query);
 });
 
-// middleware: 中介軟體 (function)
-// middleware可掛多個(用陣列)，解析完把body塞回去，沒有的話req.body會undefined
-// const bodyParser = express.urlencoded({extended: false});
-// app.post('/try-post', bodyParser, (req, res)=>{
-//     res.json(req.body);
-// });
+
 
 const bodyParser = express.urlencoded({extended: false});
 app.post('/try-post', (req, res)=>{
@@ -164,6 +166,50 @@ app.route('/try-post-form')
     .post((req, res)=>{
         const {email, password} = req.body;
         res.render('try-post-form', {email, password});
+    });
+
+// ------- 管理者登入 -----------
+    app.route('/login')
+    .get(async (req, res)=>{
+        res.render('login');
+    })
+    .post(async (req, res)=>{
+
+        const output = {
+            success: false,
+            error: '',
+            code: 0,
+        };
+        const sql = "SELECT * FROM admins WHERE account=?";
+        const [result1] = await db.query(sql, [req.body.account]);
+
+        if(! result1.length){
+            // 沒有陣列長度代表比對不到資料庫裡的帳號，帳號錯誤
+            output.code = 401;
+            output.error = '帳密錯誤'
+            return res.json(output)
+        }
+        //const row = result1[0];
+
+        output.success = await bcrypt.compare(req.body.password, result1[0].pass_hash);
+        console.log(await bcrypt.compare(req.body.password, result1[0].pass_hash));
+        if(! output.success){
+            // 密碼錯誤
+            output.code = 402;
+            output.error = '帳密錯誤'
+        }else {
+            req.session.admin = {
+                sid: result1[0].sid,
+                account: result1[0].account,
+            };
+        }
+        res.json(output);
+        // res.json(req.body)
+    });
+
+    app.get("/logout", (req, res) => {
+        delete req.session.admin;
+        res.redirect("/");
     });
 
 

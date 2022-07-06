@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <!-- fetch(`${apiHost}/try-session`) -->
+    <!-- 沒有把檔頭送出去，所以每次近來都看成新的用戶，my_var永遠都是1 -->
+    <pre id="info"></pre>
+    <script type="module">
+        import { apiHost } from './lib/settings.js';
+
+        // 前端的credentials設定成 'include' ，coockie才發得出去(credentials表設置是否傳送 cookie)
+        // domain也要是localhost才能得到cookie
+        fetch(`${apiHost}/try-session`, {
+            credentials: 'include'
+        })
+        .then(r=>r.json())
+        .then(obj=>{
+            info.innerHTML = JSON.stringify(obj, null, 4 );
+
+
+        })
+
+
+    </script>
+</body>
+</html>
+
+<!-- https://medium.com/summers-life/cros-express%E7%AB%AF%E7%9A%84%E8%A8%AD%E5%AE%9A-f94c9a3199a1 -->
+<!-- https://ithelp.ithome.com.tw/articles/10242452 -->
+<!-- https://sa123.cc/mbz87ag1594xka2ohlgj.html -->
+<!-- https://ithelp.ithome.com.tw/articles/10272148 -->
+<!-- https://medium.com/starbugs/%E5%BC%84%E6%87%82%E5%90%8C%E6%BA%90%E6%94%BF%E7%AD%96-same-origin-policy-%E8%88%87%E8%B7%A8%E7%B6%B2%E5%9F%9F-cors-e2e5c1a53a19 -->
